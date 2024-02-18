@@ -129,6 +129,8 @@ class PerceptualModel(torch.nn.Module):
             return (0.48145466, 0.4578275, 0.40821073)
         elif "mae" in model_type:
             return (0.485, 0.456, 0.406)
+        elif "synclr" in model_type:
+            return (0.485, 0.456, 0.406)
 
     def _get_std(self, model_type):
         if "dino" in model_type:
@@ -138,6 +140,8 @@ class PerceptualModel(torch.nn.Module):
         elif "clip" in model_type:
             return (0.26862954, 0.26130258, 0.27577711)
         elif "mae" in model_type:
+            return (0.229, 0.224, 0.225)
+        elif "synclr" in model_type:
             return (0.229, 0.224, 0.225)
 
 
@@ -252,6 +256,7 @@ EMBED_DIMS = {
     'dino_vits16': {'cls': 384, 'last_layer': 384},
     'dino_vitb8': {'cls': 768, 'last_layer': 768},
     'dino_vitb16': {'cls': 768, 'last_layer': 768},
+    'dinov2_vitb14': {'cls': 768, 'last_layer': 768},
     'clip_vitb16': {'cls': 768, 'embedding': 512, 'last_layer': 768},
     'clip_vitb32': {'cls': 768, 'embedding': 512, 'last_layer': 512},
     'clip_vitl14': {'cls': 1024, 'embedding': 768, 'last_layer': 768},
@@ -260,6 +265,6 @@ EMBED_DIMS = {
     'mae_vith14': {'cls': 1280, 'last_layer': 1280},
     'open_clip_vitb16': {'cls': 768, 'embedding': 512, 'last_layer': 768},
     'open_clip_vitb32': {'cls': 768, 'embedding': 512, 'last_layer': 768},
-    'open_clip_vitl14': {'cls': 1024, 'embedding': 768, 'last_layer': 768}
+    'open_clip_vitl14': {'cls': 1024, 'embedding': 768, 'last_layer': 768},
+    'synclr_vitb16': {'cls': 768, 'last_layer': 768},
 }
-

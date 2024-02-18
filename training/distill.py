@@ -15,12 +15,11 @@ from dreamsim.feature_extraction.vit_wrapper import ViTModel, ViTConfig
 import os
 import configargparse
 from tqdm import tqdm
+import pickle as pkl
+import torch.nn as nn
+from sklearn.decomposition import PCA
 
-# log = logging.getLogger("lightning.pytorch")
-# log.propagate = False
-# log.setLevel(logging.INFO)
-
-
+torch.autograd.set_detect_anomaly(True)
 def parse_args():
     parser = configargparse.ArgumentParser()
     parser.add_argument('-c', '--config', required=False, is_config_file=True, help='config file path')
@@ -36,7 +35,7 @@ def parse_args():
                         help='Which ViT model to finetune. To finetune an ensemble of models, pass a comma-separated'
                              'list of models. Accepted models: [dino_vits8, dino_vits16, dino_vitb8, dino_vitb16, '
                              'clip_vitb16, clip_vitb32, clip_vitl14, mae_vitb16, mae_vitl16, mae_vith14, '
-                             'open_clip_vitb16, open_clip_vitb32, open_clip_vitl14, dinov2_vitb14, synclr_vitb16]')
+                             'open_clip_vitb16, open_clip_vitb32, open_clip_vitl14]')
     parser.add_argument('--feat_type', type=str, default='cls',
                         help='What type of feature to extract from the model. If finetuning an ensemble, pass a '
                              'comma-separated list of features (same length as model_type). Accepted feature types: '
@@ -106,33 +105,102 @@ class LightningPerceptualModel(pl.LightningModule):
         print(pytorch_total_params)
         print(pytorch_total_trainable_params)
 
-        self.criterion = HingeLoss(margin=self.margin, device=device)
+        self.criterion = nn.L1Loss()
+        self.teacher = PerceptualModel(feat_type='cls,embedding,embedding',
+                                       model_type='dino_vitb16,clip_vitb16,open_clip_vitb16',
+                                       stride='16,16,16',
+                                       hidden_size=self.hidden_size, lora=False, load_dir=load_dir,
+                                       device=device)
 
         self.epoch_loss_train = 0.0
         self.train_num_correct = 0.0
 
+        self.automatic_optimization = False
+
+        with open('precomputed_sims.pkl', 'rb') as f:
+            self.sims = pkl.load(f)
+
+        # with open('precomputed_embeds.pkl', 'rb') as f:
+        #     self.pca = pkl.load(f)
+
     def forward(self, img_ref, img_0, img_1):
-        dist_0 = self.perceptual_model(img_ref, img_0)
-        dist_1 = self.perceptual_model(img_ref, img_1)
-        return dist_0, dist_1
+        _, embed_0, dist_0 = self.perceptual_model(img_ref, img_0)
+        embed_ref, embed_1, dist_1 = self.perceptual_model(img_ref, img_1)
+        return embed_ref, embed_0, embed_1, dist_0, dist_1
 
     def training_step(self, batch, batch_idx):
-        img_ref, img_0, img_1, target, idx = batch
-        dist_0, dist_1 = self.forward(img_ref, img_0, img_1)
+        img_ref, img_0, img_1, _, idx = batch
+        embed_ref, embed_0, embed_1, dist_0, dist_1 = self.forward(img_ref, img_0, img_1)
+
+        # with torch.no_grad():
+        #     target_embed_ref = self.teacher.embed(img_ref)
+        #     target_embed_0 = self.teacher.embed(img_0)
+        #     target_embed_1 = self.teacher.embed(img_1)
+        #
+        #     target_embed_ref = torch.tensor(self.pca.transform(target_embed_ref.cpu()), device=img_ref.device).float()
+        #     target_embed_0 = torch.tensor(self.pca.transform(target_embed_0.cpu()), device=img_ref.device).float()
+        #     target_embed_1 = torch.tensor(self.pca.transform(target_embed_1.cpu()), device=img_ref.device).float()
+
+        target_0 = [self.sims['train'][i.item()][0] for i in idx]
+        target_dist_0 = torch.tensor(target_0, device=img_ref.device)
+
+        target_1 = [self.sims['train'][i.item()][1] for i in idx]
+        target_dist_1 = torch.tensor(target_1, device=img_ref.device)
+
+        opt = self.optimizers()
+        opt.zero_grad()
+        loss_0 = self.criterion(dist_0, target_dist_0) #/ target_dist_0.shape[0]
+        # loss_ref = self.criterion(embed_ref, target_embed_ref).mean()
+        # self.manual_backward(loss_0)
+
+        loss_1 = self.criterion(dist_1, target_dist_1) #/ target_dist_1.shape[0]
+        # loss_0 = self.criterion(embed_0, target_embed_0).mean().float()
+        # self.manual_backward(loss_1)
+
+        # loss_1 = self.criterion(embed_1, target_embed_1).mean().float()
+        # self.manual_backward(loss_1)
+        loss = (loss_0 + loss_1).mean()
+        self.manual_backward(loss)
+        opt.step()
+
+        target = torch.lt(target_dist_1, target_dist_0)
         decisions = torch.lt(dist_1, dist_0)
-        logit = dist_0 - dist_1
-        loss = self.criterion(logit.squeeze(), target)
-        loss /= target.shape[0]
-        self.epoch_loss_train += loss
+
+        # self.epoch_loss_train += loss_ref
+        self.epoch_loss_train += loss_0
+        self.epoch_loss_train += loss_1
         self.train_num_correct += ((target >= 0.5) == decisions).sum()
-        return loss
+        return loss_0 + loss_1
 
     def validation_step(self, batch, batch_idx):
-        img_ref, img_0, img_1, target, id = batch
-        dist_0, dist_1 = self.forward(img_ref, img_0, img_1)
+        img_ref, img_0, img_1, _, idx = batch
+        embed_ref, embed_0, embed_1, dist_0, dist_1 = self.forward(img_ref, img_0, img_1)
+
+        # with torch.no_grad():
+        #     target_embed_ref = self.teacher.embed(img_ref)
+        #     target_embed_0 = self.teacher.embed(img_0)
+        #     target_embed_1 = self.teacher.embed(img_1)
+        #
+        #     target_embed_ref = torch.tensor(self.pca.transform(target_embed_ref.cpu()), device=img_ref.device)
+        #     target_embed_0 = torch.tensor(self.pca.transform(target_embed_0.cpu()), device=img_ref.device)
+        #     target_embed_1 = torch.tensor(self.pca.transform(target_embed_1.cpu()), device=img_ref.device)
+
+        target_0 = [self.sims['val'][i.item()][0] for i in idx]
+        target_1 = [self.sims['val'][i.item()][1] for i in idx]
+
+        target_dist_0 = torch.tensor(target_0, device=img_ref.device)
+        target_dist_1 = torch.tensor(target_1, device=img_ref.device)
+
+        target = torch.lt(target_dist_1, target_dist_0)
         decisions = torch.lt(dist_1, dist_0)
-        logit = dist_0 - dist_1
-        loss = self.criterion(logit.squeeze(), target)
+
+        loss = self.criterion(dist_0, target_dist_0)
+        loss += self.criterion(dist_1, target_dist_1)
+        # loss = self.criterion(embed_ref, target_embed_ref).float()
+        # loss += self.criterion(embed_0, target_embed_0).float()
+        # loss += self.criterion(embed_1, target_embed_1).float()
+        loss = loss.mean()
+
         val_num_correct = ((target >= 0.5) == decisions).sum()
         self.val_metrics['loss'].update(loss, target.shape[0])
         self.val_metrics['score'].update(val_num_correct, target.shape[0])
@@ -285,9 +353,3 @@ if __name__ == '__main__':
     args = parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     run(args, device)
-
-
-
-
-
-

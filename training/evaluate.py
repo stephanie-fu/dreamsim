@@ -38,7 +38,7 @@ def parse_args():
                         help='Which ViT model to evaluate. To evaluate an ensemble of models, pass a comma-separated'
                              'list of models. Accepted models: [dino_vits8, dino_vits16, dino_vitb8, dino_vitb16, '
                              'clip_vitb16, clip_vitb32, clip_vitl14, mae_vitb16, mae_vitl16, mae_vith14, '
-                             'open_clip_vitb16, open_clip_vitb32, open_clip_vitl14]')
+                             'open_clip_vitb16, open_clip_vitb32, open_clip_vitl14, dinov2_vitb14, synclr_vitb16]')
     parser.add_argument('--baseline_feat_type', type=str,
                         help='What type of feature to extract from the model. If evaluating an ensemble, pass a '
                              'comma-separated list of features (same length as model_type). Accepted feature types: '

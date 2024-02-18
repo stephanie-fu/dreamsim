@@ -1,0 +1,21 @@
+seed: 1234
+tag: lora_distill
+log_dir: /home/fus/repos/dreamsim-dev/output/dev
+
+model_type: 'clip_vitb32'
+feat_type: 'embedding'
+stride: '32'
+use_lora: True
+
+dataset_root: ./dataset/nights
+num_workers: 4
+
+lr: 0.0003
+weight_decay: 0.0
+batch_size: 32
+epochs: 15
+margin: 0.05
+
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0

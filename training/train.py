@@ -14,11 +14,6 @@ from dreamsim import PerceptualModel
 from dreamsim.feature_extraction.vit_wrapper import ViTModel, ViTConfig
 import os
 import configargparse
-from tqdm import tqdm
-
-# log = logging.getLogger("lightning.pytorch")
-# log.propagate = False
-# log.setLevel(logging.INFO)
 
 
 def parse_args():
@@ -103,8 +98,8 @@ class LightningPerceptualModel(pl.LightningModule):
 
         pytorch_total_params = sum(p.numel() for p in self.perceptual_model.parameters())
         pytorch_total_trainable_params = sum(p.numel() for p in self.perceptual_model.parameters() if p.requires_grad)
-        print(pytorch_total_params)
-        print(pytorch_total_trainable_params)
+        print(f'Total params: {pytorch_total_params} | Trainable params: {pytorch_total_trainable_params} '
+              f'| % Trainable: {pytorch_total_trainable_params/pytorch_total_params}')
 
         self.criterion = HingeLoss(margin=self.margin, device=device)
 

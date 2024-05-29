@@ -1,7 +1,10 @@
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torchvision import transforms
 import os
+
+from util.constants import *
 from .feature_extraction.extractor import ViTExtractor
 import yaml
 from peft import PeftModel, LoraConfig, get_peft_model
@@ -41,7 +44,7 @@ class PerceptualModel(torch.nn.Module):
         self.stride_list = [int(x) for x in stride.split(',')]
         self._validate_args()
         self.extract_feats_list = []
-        self.extractor_list = []
+        self.extractor_list = nn.ModuleList()
         self.embed_size = 0
         self.hidden_size = hidden_size
         self.baseline = baseline
@@ -122,27 +125,23 @@ class PerceptualModel(torch.nn.Module):
 
     def _get_mean(self, model_type):
         if "dino" in model_type:
-            return (0.485, 0.456, 0.406)
+            return IMAGENET_DEFAULT_MEAN
         elif "open_clip" in model_type:
-            return (0.48145466, 0.4578275, 0.40821073)
+            return OPENAI_CLIP_MEAN
         elif "clip" in model_type:
-            return (0.48145466, 0.4578275, 0.40821073)
+            return OPENAI_CLIP_MEAN
         elif "mae" in model_type:
-            return (0.485, 0.456, 0.406)
-        elif "synclr" in model_type:
-            return (0.485, 0.456, 0.406)
+            return IMAGENET_DEFAULT_MEAN
 
     def _get_std(self, model_type):
         if "dino" in model_type:
-            return (0.229, 0.224, 0.225)
+            return IMAGENET_DEFAULT_STD
         elif "open_clip" in model_type:
-            return (0.26862954, 0.26130258, 0.27577711)
+            return OPENAI_CLIP_STD
         elif "clip" in model_type:
-            return (0.26862954, 0.26130258, 0.27577711)
+            return OPENAI_CLIP_STD
         elif "mae" in model_type:
-            return (0.229, 0.224, 0.225)
-        elif "synclr" in model_type:
-            return (0.229, 0.224, 0.225)
+            return IMAGENET_DEFAULT_STD
 
 
 class MLP(torch.nn.Module):

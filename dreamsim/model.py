@@ -8,7 +8,6 @@ from util.constants import *
 from .feature_extraction.extractor import ViTExtractor
 import yaml
 from peft import PeftModel, LoraConfig, get_peft_model
-from .feature_extraction.vit_wrapper import ViTConfig, ViTModel
 from .config import dreamsim_args, dreamsim_weights
 import os
 import zipfile
@@ -216,17 +215,14 @@ def dreamsim(pretrained: bool = True, device="cuda", cache_dir="./models", norma
     model_list = dreamsim_args['model_config'][dreamsim_type]['model_type'].split(",")
     ours_model = PerceptualModel(**dreamsim_args['model_config'][dreamsim_type], device=device, load_dir=cache_dir,
                                  normalize_embeds=normalize_embeds)
-    for extractor in ours_model.extractor_list:
-        lora_config = LoraConfig(**dreamsim_args['lora_config'])
-        model = get_peft_model(ViTModel(extractor.model, ViTConfig()), lora_config)
-        extractor.model = model
 
-    tag = "" if dreamsim_type == "ensemble" else "single_"
+    lora_config = LoraConfig(**dreamsim_args['lora_config'])
+    ours_model = get_peft_model(ours_model, lora_config)
+
+    tag = "" if dreamsim_type == "ensemble" else f"single_{model_list[0]}"
     if pretrained:
-        for extractor, name in zip(ours_model.extractor_list, model_list):
-            load_dir = os.path.join(cache_dir, f"{name}_{tag}lora")
-            extractor.model = PeftModel.from_pretrained(extractor.model, load_dir).to(device)
-            extractor.model.eval().requires_grad_(False)
+        load_dir = os.path.join(cache_dir, f"{tag}lora")
+        ours_model = PeftModel.from_pretrained(ours_model.base_model.model, load_dir).to(device)
 
     ours_model.eval().requires_grad_(False)
 

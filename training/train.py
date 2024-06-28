@@ -179,11 +179,13 @@ class LightningPerceptualModel(pl.LightningModule):
         optimizer = torch.optim.Adam(params, lr=self.lr, betas=(0.5, 0.999), weight_decay=self.weight_decay)
         return [optimizer]
 
-    def load_lora_weights(self, checkpoint_root, epoch_load):
+    def load_lora_weights(self, checkpoint_root, epoch_load=None):
         if self.save_mode in {'adapter_only', 'all'}:
-            load_dir = os.path.join(checkpoint_root, f'epoch_{epoch_load}')
-            logging.info(f'Loading adapter weights from {load_dir}')
-            self.perceptual_model = PeftModel.from_pretrained(self.perceptual_model.base_model.model, load_dir).to(self.device)
+            if epoch_load is not None:
+                checkpoint_root = os.path.join(checkpoint_root, f'epoch_{epoch_load}')
+            
+            logging.info(f'Loading adapter weights from {checkpoint_root}')
+            self.perceptual_model = PeftModel.from_pretrained(self.perceptual_model.base_model.model, checkpoint_root).to(self.device)
         else:
             logging.info(f'Loading entire model from {checkpoint_root}')
             sd = torch.load(os.path.join(checkpoint_root, f'epoch={epoch_load:02d}.ckpt'))['state_dict']

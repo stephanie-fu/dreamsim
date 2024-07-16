@@ -25,13 +25,6 @@ dreamsim_args = {
                 "lora": True
             }
         },
-        "lora_config": {
-            "r": 16,
-            "lora_alpha": 0.5,
-            "lora_dropout": 0.3,
-            "bias": "none",
-            "target_modules": ['qkv']
-        },
         "img_size": 224
     }
 

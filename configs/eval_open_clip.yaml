@@ -1,0 +1,19 @@
+tag: "ensemble"
+
+eval_checkpoint: "/vision-nfs/isola/projects/shobhita/code/dreamsim/dreamsim_steph/new_checkpoints/lora_ensemble_dino_vitb16,clip_vitb16,open_clip_vitb16_cls,embedding,embedding_lora_lr_0.0003_batchsize_16_wd_0.0_hiddensize_1_margin_0.05_lorar_16_loraalpha_1.0_loradropout_0.3/lightning_logs/version_0/checkpoints/ensemble_lora/"
+eval_checkpoint_cfg: "/vision-nfs/isola/projects/shobhita/code/dreamsim/dreamsim_steph/new_checkpoints/lora_ensemble_dino_vitb16,clip_vitb16,open_clip_vitb16_cls,embedding,embedding_lora_lr_0.0003_batchsize_16_wd_0.0_hiddensize_1_margin_0.05_lorar_16_loraalpha_1.0_loradropout_0.3/lightning_logs/version_0/config.yaml"
+load_dir: "/vision-nfs/isola/projects/shobhita/code/dreamsim/models"
+
+baseline_model: "dino_vitb16,clip_vitb16,open_clip_vitb16"
+baseline_feat_type: "cls,embedding,embedding"
+baseline_stride: "16,16,16"
+
+nights_root: "/vision-nfs/isola/projects/shobhita/data/nights"
+bapps_root: "/vision-nfs/isola/projects/shobhita/data/2afc/val"
+things_root: "/vision-nfs/isola/projects/shobhita/data/things/things_src_images"
+things_file: "/vision-nfs/isola/projects/shobhita/data/things/things_valset.txt"
+df2_root: "/data/vision/phillipi/perception/data/df2_org3/"
+df2_gt: "/data/vision/phillipi/perception/code/repalignment/configs/df2_gt.json"
+
+batch_size: 256
+num_workers: 10

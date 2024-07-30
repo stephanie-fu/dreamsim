@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import os
 import yaml
 import logging
+import json
 from training.train import LightningPerceptualModel
 from evaluation.score import score_nights_dataset, score_things_dataset, score_bapps_dataset, score_df2_dataset
 from evaluation.eval_datasets import ThingsDataset, BAPPSDataset, DF2Dataset
@@ -29,6 +30,9 @@ def parse_args():
 
     ## Run options
     parser.add_argument('--seed', type=int, default=1234)
+    parser.add_argument('--output', type=str, default="./eval_outputs", help="Dir to save results in.")
+    parser.add_argument('--tag', type=str, default="", help="Exp name for saving results")
+    
 
     ## Checkpoint evaluation options
     parser.add_argument('--eval_checkpoint', type=str, help="Path to a checkpoint root.")
@@ -41,12 +45,12 @@ def parse_args():
     parser.add_argument('--baseline_stride', type=str, default=None)
 
     ## Dataset options
-    parser.add_argument('--nights_root', type=str, default='./dataset/nights', help='path to nights dataset.')
-    parser.add_argument('--bapps_root', type=str, default='./dataset/bapps', help='path to bapps images.')
-    parser.add_argument('--things_root', type=str, default='./dataset/things/things_imgs', help='path to things images.')
-    parser.add_argument('--things_file', type=str, default='./dataset/things/things_trainset.txt', help='path to things info file.')
-    parser.add_argument('--df2_root', type=str, default='./dataset/df2', help='path to df2 root.')
-    parser.add_argument('--df2_gt', type=str, default='./dataset/df2/df2_gt.json', help='path to df2 ground truth json.')
+    parser.add_argument('--nights_root', type=str, default=None, help='path to nights dataset.')
+    parser.add_argument('--bapps_root', type=str, default=None, help='path to bapps images.')
+    parser.add_argument('--things_root', type=str, default=None, help='path to things images.')
+    parser.add_argument('--things_file', type=str, default=None, help='path to things info file.')
+    parser.add_argument('--df2_root', type=str, default=None, help='path to df2 root.')
+    parser.add_argument('--df2_gt', type=str, default=None, help='path to df2 ground truth json.')
     parser.add_argument('--num_workers', type=int, default=16)
     parser.add_argument('--batch_size', type=int, default=4, help='dataset batch size.')
 
@@ -70,16 +74,6 @@ def load_baseline_model(args, device="cuda"):
     model = model.to(device)
     preprocess = "DEFAULT"
     return model, preprocess
-    # clip_transform = transforms.Compose([
-    #     transforms.Resize((224,224), interpolation=transforms.InterpolationMode.BICUBIC),
-    #     # transforms.CenterCrop(224),
-    #     lambda x: x.convert('RGB'),
-    #     transforms.ToTensor(),
-    #     transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-    # ])
-    # model, preprocess = clip.load("ViT-B/32", device=device)
-    # model.visual.ln_post = torch.nn.Identity()
-    # return model, clip_transform
 
 def eval_nights(model, preprocess, device, args):
     eval_results = {}
@@ -100,19 +94,24 @@ def eval_nights(model, preprocess, device, args):
     eval_results['nights_no_imagenet'] = no_imagenet_score.item()
     eval_results['nights_total'] = (imagenet_score.item() * len(test_dataset_imagenet) +
                                     no_imagenet_score.item() * len(test_dataset_no_imagenet)) / total_length
-    logging.info(f"Combined 2AFC score: {str(eval_results['nights_total'])}")
+    logging.info(f"NIGHTS (validation 2AFC): {str(eval_results['nights_val'])}")
+    logging.info(f"NIGHTS (imagenet 2AFC): {str(eval_results['nights_imagenet'])}")
+    logging.info(f"NIGHTS (no-imagenet 2AFC): {str(eval_results['nights_no_imagenet'])}")
+    logging.info(f"NIGHTS (total 2AFC): {str(eval_results['nights_total'])}")
     return eval_results
 
 def eval_bapps(model, preprocess, device, args):
     test_dataset_bapps = BAPPSDataset(root_dir=args.bapps_root, preprocess=preprocess)
     test_loader_bapps = DataLoader(test_dataset_bapps, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False)
     bapps_score = score_bapps_dataset(model, test_loader_bapps, device)
+    logging.info(f"BAPPS (total 2AFC): {str(bapps_score)}")
     return {"bapps_total": bapps_score}
 
 def eval_things(model, preprocess, device, args):
     test_dataset_things = ThingsDataset(root_dir=args.things_root, txt_file=args.things_file, preprocess=preprocess)
     test_loader_things = DataLoader(test_dataset_things, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False)
     things_score = score_things_dataset(model, test_loader_things, device)
+    logging.info(f"THINGS (total 2AFC): {things_score}")
     return {"things_total": things_score}
 
 def eval_df2(model, preprocess, device, args):
@@ -121,26 +120,41 @@ def eval_df2(model, preprocess, device, args):
     train_loader_df2 = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,pin_memory=True)
     test_loader_df2 = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,pin_memory=True)
     df2_score = score_df2_dataset(model, train_loader_df2, test_loader_df2, args.df2_gt, device)
+    logging.info(f"DF2 (total recall@k): {str(recall)}")
     return {"df2_total": df2_score}
 
+def full_eval(eval_model, preprocess, device, args):
+    results = {}
+    if args.nights_root is not None:
+        results['ckpt_nights'] = eval_nights(eval_model, preprocess, device, args)
+    if args.bapps_root is not None:
+        results['ckpt_bapps'] = bapps_results = eval_bapps(eval_model, preprocess, device, args)
+    if args.things_root is not None:
+        results['ckpt_things'] = eval_things(eval_model, preprocess, device, args)
+    if args.df2_root is not None:
+        results['ckpt_df2_root'] = eval_df2(eval_model, preprocess, device, args)
+    return results
+    
 def run(args, device):
     logging.basicConfig(filename=os.path.join(args.eval_checkpoint, 'eval.log'), level=logging.INFO, force=True)
     seed_everything(args.seed)
     g = torch.Generator()
     g.manual_seed(args.seed)
+
+    os.makedirs(args.output, exist_ok=True)
     
-    eval_model, preprocess = load_dreamsim_model(args)
-    nights_results = eval_nights(eval_model, preprocess, device, args)
-    bapps_results = eval_bapps(eval_model, preprocess, device, args)
-    things_results = eval_things(eval_model, preprocess, device, args)
-    df2_results = eval_df2(eval_model, preprocess, device, args)
-    
-    if "baseline_model" in args:
+    full_results = {}
+    if args.eval_checkpoint is not None:
+        eval_model, preprocess = load_dreamsim_model(args)
+        full_results['ckpt'] = full_eval(eval_model, preprocess, device, args)
+    if args.baseline_model is not None:
         baseline_model, baseline_preprocess = load_baseline_model(args)
-        nights_results = eval_nights(baseline_model, baseline_preprocess, device, args)
-        bapps_results = eval_bapps(baseline_model, baseline_preprocess, device, args)
-        things_results = eval_things(baseline_model, baseline_preprocess, device, args)
-        df2_results = eval_df2(baseline_model, baseline_preprocess, device, args)
+        full_results['baseline'] = full_eval(baseline_model, baseline_preprocess, device, args)
+
+    tag = args.tag + "_" if len(args.tag) > 0 else ""
+    with open(os.path.join(args.output, f"{tag}eval_results.json"), "w") as f:
+        json.dump(full_results, f)
+    
 
 if __name__ == '__main__':
     args = parse_args()

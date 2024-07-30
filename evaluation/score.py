@@ -41,6 +41,7 @@ def score_nights_dataset(model, test_loader, device):
 def score_things_dataset(model, test_loader, device):
     logging.info("Evaluating Things dataset.")
     count = 0
+    total = 0
     with torch.no_grad():
         for i, (img_1, img_2, img_3) in tqdm(enumerate(test_loader), total=len(test_loader)):
             img_1, img_2, img_3 = img_1.to(device), img_2.to(device), img_3.to(device)
@@ -53,9 +54,10 @@ def score_things_dataset(model, test_loader, device):
             le_2_3 = torch.le(dist_1_2, dist_2_3)
 
             count += sum(torch.logical_and(le_1_3, le_2_3))
+            total += len(torch.logical_and(le_1_3, le_2_3))
     count = count.detach().cpu().numpy()
-    accs = count / len(full_dataset)
-    print(f"Things accs: {str(accs)}")
+    total = total.detach().cpu().numpy()
+    accs = count / total
     return accs
 
 def score_bapps_dataset(model, test_loader, device):
@@ -77,7 +79,6 @@ def score_bapps_dataset(model, test_loader, device):
     ps = torch.cat(ps, dim=0)
     scores = (d0s < d1s) * (1.0 - ps) + (d1s < d0s) * ps + (d1s == d0s) * 0.5
     final_score = torch.mean(scores, dim=0)
-    print(f"BAPPS score: {str(final_score)}")
     return final_score
 
 def score_df2_dataset(model, train_loader, test_loader, gt_path, device):
@@ -129,7 +130,6 @@ def score_df2_dataset(model, train_loader, test_loader, gt_path, device):
     for k in ks:
         recall[k] = retrieved[k] / test_embeds.shape[0]
 
-    print(f"DF2 recall@k: {str(recall)}")
     return recall
 
 

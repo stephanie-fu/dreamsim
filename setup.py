@@ -16,7 +16,7 @@ setuptools.setup(
     install_requires=[
         "numpy",
         "open-clip-torch",
-        "peft==0.1.0",
+        "peft",
         "Pillow",
         "torch",
         "timm",

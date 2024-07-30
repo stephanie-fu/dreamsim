@@ -56,7 +56,6 @@ def score_things_dataset(model, test_loader, device):
             count += sum(torch.logical_and(le_1_3, le_2_3))
             total += len(torch.logical_and(le_1_3, le_2_3))
     count = count.detach().cpu().numpy()
-    total = total.detach().cpu().numpy()
     accs = count / total
     return accs
 
@@ -80,57 +79,3 @@ def score_bapps_dataset(model, test_loader, device):
     scores = (d0s < d1s) * (1.0 - ps) + (d1s < d0s) * ps + (d1s == d0s) * 0.5
     final_score = torch.mean(scores, dim=0)
     return final_score
-
-def score_df2_dataset(model, train_loader, test_loader, gt_path, device):
-
-    def extract_feats(model, dataloader):
-        embeds = []
-        paths = []
-        for im, path in tqdm(dataloader):
-            im = im.to(device)
-            paths.append(path)
-            with torch.no_grad():
-                out = model.embed(im).squeeze()
-                embeds.append(out.to("cpu"))
-        embeds = torch.vstack(embeds).numpy()
-        paths = np.concatenate(paths)
-        return embeds, paths
-
-    train_embeds, train_paths = extract_feats(model, train_loader)
-    train_embeds = torch.from_numpy(train_embeds).to('cuda')
-    test_embeds, test_paths = extract_feats(model, test_loader)
-    test_embeds = torch.from_numpy(test_embeds).to('cuda')
-
-    with open(gt_path, "r") as f:
-        gt = json.load(f)
-
-    ks = [1, 3, 5]
-    all_results = {}
-
-    relevant = {k: 0 for k in ks}
-    retrieved = {k: 0 for k in ks}
-    recall = {k: 0 for k in ks}
-    
-    for i in tqdm(range(test_embeds.shape[0]), total=test_embeds.shape[0]):
-        sim = F.cosine_similarity(test_embeds[i, :], train_embeds, dim=-1)
-        ranks = torch.argsort(-sim).cpu()
-
-        query_path = test_paths[i]
-        total_relevant = len(gt[query_path])
-        gt_retrievals = gt[query_path]
-        for k in ks:
-            if k > 1:
-                k_retrieved = int(len([x for x in train_paths[ranks.cpu()[:k]] if x in gt_retrievals]) >0)
-            else:
-                k_retrieved = int(train_paths[ranks.cpu()[:k]] in gt_retrievals)
-    
-            relevant[k] += total_relevant
-            retrieved[k] += k_retrieved
-    
-    for k in ks:
-        recall[k] = retrieved[k] / test_embeds.shape[0]
-
-    return recall
-
-
-

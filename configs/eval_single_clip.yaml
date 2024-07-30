@@ -1,12 +1,12 @@
-tag: "open_clip"
+tag: "clip"
 
 eval_checkpoint: "/path-to-ckpt/lightning_logs/version_0/checkpoints/epoch-to-eval/"
 eval_checkpoint_cfg: "/path-to-ckpt/lightning_logs/version_0/config.yaml"
 load_dir: "./models"
 
-baseline_model: "dino_vitb16,clip_vitb16,open_clip_vitb16"
-baseline_feat_type: "cls,embedding,embedding"
-baseline_stride: "16,16,16"
+baseline_model: "clip_vitb32"
+baseline_feat_type: "cls"
+baseline_stride: "32"
 
 nights_root: "./data/nights"
 bapps_root: "./data/2afc/val"

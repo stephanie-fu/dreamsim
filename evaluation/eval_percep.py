@@ -8,8 +8,8 @@ import yaml
 import logging
 import json
 from training.train import LightningPerceptualModel
-from evaluation.score import score_nights_dataset, score_things_dataset, score_bapps_dataset, score_df2_dataset
-from evaluation.eval_datasets import ThingsDataset, BAPPSDataset, DF2Dataset
+from evaluation.score import score_nights_dataset, score_things_dataset, score_bapps_dataset
+from evaluation.eval_datasets import ThingsDataset, BAPPSDataset
 from torchmetrics.functional import structural_similarity_index_measure, peak_signal_noise_ratio
 from DISTS_pytorch import DISTS
 from dreamsim import PerceptualModel
@@ -114,15 +114,6 @@ def eval_things(model, preprocess, device, args):
     logging.info(f"THINGS (total 2AFC): {things_score}")
     return {"things_total": things_score}
 
-def eval_df2(model, preprocess, device, args):
-    train_dataset = DF2Dataset(root_dir=args.df2_root, split="gallery", preprocess=preprocess)
-    test_dataset = DF2Dataset(root_dir=args.df2_root, split="customer", preprocess=preprocess)
-    train_loader_df2 = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,pin_memory=True)
-    test_loader_df2 = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers,pin_memory=True)
-    df2_score = score_df2_dataset(model, train_loader_df2, test_loader_df2, args.df2_gt, device)
-    logging.info(f"DF2 (total recall@k): {str(recall)}")
-    return {"df2_total": df2_score}
-
 def full_eval(eval_model, preprocess, device, args):
     results = {}
     if args.nights_root is not None:
@@ -131,8 +122,6 @@ def full_eval(eval_model, preprocess, device, args):
         results['ckpt_bapps'] = bapps_results = eval_bapps(eval_model, preprocess, device, args)
     if args.things_root is not None:
         results['ckpt_things'] = eval_things(eval_model, preprocess, device, args)
-    if args.df2_root is not None:
-        results['ckpt_df2_root'] = eval_df2(eval_model, preprocess, device, args)
     return results
     
 def run(args, device):

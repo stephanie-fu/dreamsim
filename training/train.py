@@ -33,7 +33,7 @@ def parse_args():
                         help='Which ViT model to finetune. To finetune an ensemble of models, pass a comma-separated'
                              'list of models. Accepted models: [dino_vits8, dino_vits16, dino_vitb8, dino_vitb16, '
                              'clip_vitb16, clip_vitb32, clip_vitl14, mae_vitb16, mae_vitl16, mae_vith14, '
-                             'open_clip_vitb16, open_clip_vitb32, open_clip_vitl14, dinov2_vitb14, synclr_vitb16]')
+                             'open_clip_vitb16, open_clip_vitb32, open_clip_vitl14]')
     parser.add_argument('--feat_type', type=str, default='cls',
                         help='What type of feature to extract from the model. If finetuning an ensemble, pass a '
                              'comma-separated list of features (same length as model_type). Accepted feature types: '
@@ -183,7 +183,7 @@ class LightningPerceptualModel(pl.LightningModule):
         if self.save_mode in {'adapter_only', 'all'}:
             if epoch_load is not None:
                 checkpoint_root = os.path.join(checkpoint_root, f'epoch_{epoch_load}')
-            
+
             logging.info(f'Loading adapter weights from {checkpoint_root}')
             self.perceptual_model = PeftModel.from_pretrained(self.perceptual_model.base_model.model, checkpoint_root).to(self.device)
         else:

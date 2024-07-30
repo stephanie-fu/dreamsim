@@ -1,3 +1,5 @@
+import json
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -7,11 +9,19 @@ import os
 from util.constants import *
 from .feature_extraction.extractor import ViTExtractor
 import yaml
+import peft
 from peft import PeftModel, LoraConfig, get_peft_model
 from .config import dreamsim_args, dreamsim_weights
 import os
 import zipfile
+from packaging import version
 
+peft_version = version.parse(peft.__version__)
+min_version = version.parse('0.2.0')
+
+if peft_version < min_version:
+    raise RuntimeError(f"DreamSim requires peft version {min_version} or greater. "
+                       "Please update peft with 'pip install --upgrade peft'.")
 
 class PerceptualModel(torch.nn.Module):
     def __init__(self, model_type: str = "dino_vitb16", feat_type: str = "cls", stride: str = '16', hidden_size: int = 1,
@@ -165,9 +175,8 @@ def download_weights(cache_dir, dreamsim_type):
     """
 
     dreamsim_required_ckpts = {
-        "ensemble": ["dino_vitb16_pretrain.pth", "dino_vitb16_lora",
-                     "open_clip_vitb16_pretrain.pth.tar", "open_clip_vitb16_lora",
-                     "clip_vitb16_pretrain.pth.tar", "clip_vitb16_lora"],
+        "ensemble": ["dino_vitb16_pretrain.pth", "open_clip_vitb16_pretrain.pth.tar",
+                     "clip_vitb16_pretrain.pth.tar", "ensemble_lora"],
         "dino_vitb16": ["dino_vitb16_pretrain.pth", "dino_vitb16_single_lora"],
         "open_clip_vitb32": ["open_clip_vitb32_pretrain.pth.tar", "open_clip_vitb32_single_lora"],
         "clip_vitb32": ["clip_vitb32_pretrain.pth.tar", "clip_vitb32_single_lora"]
@@ -216,10 +225,14 @@ def dreamsim(pretrained: bool = True, device="cuda", cache_dir="./models", norma
     ours_model = PerceptualModel(**dreamsim_args['model_config'][dreamsim_type], device=device, load_dir=cache_dir,
                                  normalize_embeds=normalize_embeds)
 
-    lora_config = LoraConfig(**dreamsim_args['lora_config'])
+    tag = "ensemble_" if dreamsim_type == "ensemble" else f"{model_list[0]}_single_"
+
+    with open(os.path.join(cache_dir, f'{tag}lora', 'adapter_config.json'), 'r') as f:
+        adapter_config = json.load(f)
+    lora_keys = ['r', 'lora_alpha', 'lora_dropout', 'bias', 'target_modules']
+    lora_config = LoraConfig(**{k: adapter_config[k] for k in lora_keys})
     ours_model = get_peft_model(ours_model, lora_config)
 
-    tag = "" if dreamsim_type == "ensemble" else f"single_{model_list[0]}"
     if pretrained:
         load_dir = os.path.join(cache_dir, f"{tag}lora")
         ours_model = PeftModel.from_pretrained(ours_model.base_model.model, load_dir).to(device)
@@ -251,7 +264,6 @@ EMBED_DIMS = {
     'dino_vits16': {'cls': 384, 'last_layer': 384},
     'dino_vitb8': {'cls': 768, 'last_layer': 768},
     'dino_vitb16': {'cls': 768, 'last_layer': 768},
-    'dinov2_vitb14': {'cls': 768, 'last_layer': 768},
     'clip_vitb16': {'cls': 768, 'embedding': 512, 'last_layer': 768},
     'clip_vitb32': {'cls': 768, 'embedding': 512, 'last_layer': 512},
     'clip_vitl14': {'cls': 1024, 'embedding': 768, 'last_layer': 768},
@@ -260,6 +272,5 @@ EMBED_DIMS = {
     'mae_vith14': {'cls': 1280, 'last_layer': 1280},
     'open_clip_vitb16': {'cls': 768, 'embedding': 512, 'last_layer': 768},
     'open_clip_vitb32': {'cls': 768, 'embedding': 512, 'last_layer': 768},
-    'open_clip_vitl14': {'cls': 1024, 'embedding': 768, 'last_layer': 768},
-    'synclr_vitb16': {'cls': 768, 'last_layer': 768},
+    'open_clip_vitl14': {'cls': 1024, 'embedding': 768, 'last_layer': 768}
 }

@@ -1,24 +1,16 @@
-from pytorch_lightning import seed_everything
-import torch
-from dataset.dataset import TwoAFCDataset
-from util.utils import get_preprocess
-from torch.utils.data import DataLoader
 import os
 import yaml
 import logging
 import json
+import torch
+import configargparse
+from torch.utils.data import DataLoader
+from pytorch_lightning import seed_everything
+from dreamsim import PerceptualModel
+from dataset.dataset import TwoAFCDataset
 from training.train import LightningPerceptualModel
 from evaluation.score import score_nights_dataset, score_things_dataset, score_bapps_dataset
 from evaluation.eval_datasets import ThingsDataset, BAPPSDataset
-from torchmetrics.functional import structural_similarity_index_measure, peak_signal_noise_ratio
-from DISTS_pytorch import DISTS
-from dreamsim import PerceptualModel
-from tqdm import tqdm
-import pickle
-import configargparse
-from dreamsim import dreamsim
-import clip
-from torchvision import transforms
 
 log = logging.getLogger("lightning.pytorch")
 log.propagate = False

@@ -1,18 +1,18 @@
+import os
+import glob
+import numpy as np
+from PIL import Image
 from torch.utils.data import Dataset
 from util.utils import get_preprocess_fn
 from torchvision import transforms
-import pandas as pd
-import numpy as np
-from PIL import Image
-import os
-from typing import Callable
-import torch
-import glob
 
 IMAGE_EXTENSIONS = ["jpg", "png", "JPEG", "jpeg"]
 
-
 class ThingsDataset(Dataset):
+     """
+     txt_file is expected to be the things_valset.txt list of triplets from the THINGS dataset.
+     root_dir is expected to be a directory of THINGS images.
+     """
      def __init__(self, root_dir: str, txt_file: str, preprocess: str, load_size: int = 224,
                  interpolation: transforms.InterpolationMode = transforms.InterpolationMode.BICUBIC):
          with open(txt_file, "r") as f:
@@ -37,10 +37,12 @@ class ThingsDataset(Dataset):
          return im_1, im_2, im_3
 
 
-
 class BAPPSDataset(Dataset):
      def __init__(self, root_dir: str, preprocess: str, load_size: int = 224,
                  interpolation: transforms.InterpolationMode = transforms.InterpolationMode.BICUBIC):
+         """
+         root_dir is expected to be the default validation folder of the BAPPS dataset.
+         """
          data_types = ["cnn", "traditional", "color", "deblur", "superres", "frameinterp"]
          
          self.preprocess_fn = get_preprocess_fn(preprocess, load_size, interpolation)

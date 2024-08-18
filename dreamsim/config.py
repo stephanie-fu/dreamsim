@@ -28,6 +28,7 @@ dreamsim_args = {
         "img_size": 224
     }
 
+# UPDATE
 dreamsim_weights = {
     "ensemble": "https://github.com/ssundaram21/dreamsim/releases/download/v0.1.0/dreamsim_checkpoint.zip",
     "dino_vitb16": "https://github.com/ssundaram21/dreamsim/releases/download/v0.1.2/dreamsim_dino_vitb16_checkpoint.zip",
